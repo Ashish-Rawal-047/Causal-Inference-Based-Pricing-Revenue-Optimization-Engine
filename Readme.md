@@ -1,917 +1,324 @@
 # Causal Pricing Intelligence & Optimization Engine
 
-> A causal inference and uplift modeling framework for estimating price elasticity, identifying heterogeneous treatment effects, and optimizing pricing strategies for two-sided marketplaces.
-
-## Overview
-
-The **Causal Pricing Intelligence & Optimization Engine** is an end-to-end analytics and causal machine learning system designed to answer a fundamental marketplace question:
-
-> **"If we change the price or discount for a particular customer segment, what will happen to demand, revenue, and margin?"**
-
-Traditional pricing analysis often relies on correlation-based regression. However, observed prices are influenced by many factors including demand, geography, seasonality, promotions, customer behavior, and competitive conditions.
-
-As a result:
-
-```text
-Correlation ≠ Causation
-```
-
-This project progressively moves from **naive elasticity estimation** to **causal inference** and finally to **heterogeneous treatment-effect modeling**, allowing pricing decisions to be evaluated based on estimated incremental impact rather than simple correlations.
+> An end-to-end causal inference, heterogeneous uplift modeling, and margin-constrained pricing optimization system for two-sided marketplaces.
 
 ---
 
-## Key Objectives
+## Overview
 
-The system is designed to:
+The **Causal Pricing Intelligence & Optimization Engine** answers a core marketplace decision question:
 
-* Estimate price elasticity of demand
-* Correct for confounding in observed pricing data
-* Estimate causal effects of price/discount changes
-* Identify customer and geographic segments with different price sensitivity
-* Estimate heterogeneous treatment effects
-* Rank customers/segments by expected incremental revenue
-* Compare targeted pricing against flat/random pricing strategies
-* Backtest pricing strategies on a held-out time period
-* Quantify uncertainty and potential business impact
+> **"If we change the price or discount for a particular customer segment, what will happen to demand, revenue, and margin?"**
+
+Conventional pricing analysis often relies on correlation-based regression. In real marketplaces, observed prices are endogenous—influenced by demand shocks, geography, seasonality, promotions, seller availability, and customer cohorts. Consequently:
+
+```text
+Correlation != Causation
+```
+
+This repository implements the complete progression from exploratory analytics and naive regression to causal identification (2SLS Instrumental Variables and Difference-in-Differences), heterogeneous treatment effects (T-Learner and X-Learner), uplift ranking (AUUC / Qini / PEHE), constrained pricing optimization, chronological backtesting, and robustness stress testing.
 
 ---
 
 ## Business Problem
 
-Consider a marketplace that increases a discount from **10% → 15%**.
-
-A naive analysis might observe:
+Suppose a marketplace increases a discount from **0% -> 15%**, or raises prices during peak demand. A naive regression can observe higher prices alongside higher quantities (or higher discounts alongside lower demand) because prices respond to unobserved demand shocks (`u_demand`) and regional income mix:
 
 ```text
-Discount ↑
-     ↓
-Orders ↑
+Unobserved Demand / Region Mix
+       │
+       ├──────────────► Higher Prices
+       │
+       └──────────────► Higher Demand
 ```
 
-and conclude:
+Additionally, treating all customers uniformly destroys margin on price-inelastic cohorts (e.g., loyal or affluent buyers), even when total unit volume increases. The engine solves this by separating **causal demand sensitivity** from **confounding**, estimating **segment- and customer-level CATE**, and selecting feasible pricing actions that **maximize expected incremental margin** subject to business guardrails.
 
-> "Increasing discounts increases demand."
+---
 
-But this may be incorrect.
-
-The company may have increased discounts precisely when demand was expected to fall.
-
-Other confounders may include:
-
-* Weekend vs weekday
-* Festival/holiday periods
-* Region
-* Customer cohort
-* Product category
-* Competitor pricing
-* Seasonality
-* Weather
-* Seller availability
-* Existing customer intent
-
-Therefore, the observed relationship can be represented as:
+## System Architecture
 
 ```text
-Price / Discount
-       ↓
-    Demand
-       ↑
-   Confounders
-```
-
-The goal of this project is to estimate:
-
-```text
-                 ┌─────────────────────┐
-                 │   Pricing Decision   │
-                 └──────────┬──────────┘
-                            │
-                            ▼
-                  ┌──────────────────┐
-                  │ Causal Estimator │
-                  └────────┬─────────┘
-                           │
-                           ▼
-                ┌──────────────────────┐
-                │ Treatment Effect     │
-                │ / Elasticity         │
-                └──────────┬───────────┘
-                           │
-                           ▼
-                 ┌─────────────────────┐
-                 │ Segment Optimization│
-                 └──────────┬──────────┘
-                            │
-                            ▼
-                  Revenue / Margin Lift
+                       Transaction Data (Synthetic Ground-Truth or Olist)
+                                              │
+                                              ▼
+                       ┌──────────────────────────────────────────────┐
+                       │ Preprocessing & Leakage Validation           │
+                       │ (cleaning.py, feature_engineering.py,        │
+                       │  validation.py: chronological prior features)│
+                       └──────────────────────┬───────────────────────┘
+                                              │
+                        ┌─────────────────────┴─────────────────────┐
+                        ▼                                           ▼
+         ┌─────────────────────────────┐             ┌─────────────────────────────┐
+         │ Baseline & Confounding      │             │ Causal Identification       │
+         │ • Linear & Log-Log OLS      │             │ • 2SLS IV (First/2nd Stage) │
+         │ • Segment Elasticities      │             │ • DiD + Event Study         │
+         │ • Simpson's Paradox & DAG   │             │ • Balance, Overlap & Sens.  │
+         └──────────────┬──────────────┘             └──────────────┬──────────────┘
+                        └─────────────────────┬─────────────────────┘
+                                              ▼
+                       ┌──────────────────────────────────────────────┐
+                       │ Heterogeneous Treatment Effects & Uplift     │
+                       │ • S-Learner Baseline, T-Learner, X-Learner   │
+                       │ • AUUC, Qini Coefficient, PEHE, Segment CATE │
+                       └──────────────────────┬───────────────────────┘
+                                              ▼
+                       ┌──────────────────────────────────────────────┐
+                       │ Pricing Optimization & Business Guardrails   │
+                       │ • Candidate Actions: [-10%, -5%, 0, +5, +10] │
+                       │ • Objective: Max Expected Incremental Margin │
+                       │ • Policies: Flat, Random, Segment, Uplift    │
+                       └──────────────────────┬───────────────────────┘
+                                              ▼
+                       ┌──────────────────────────────────────────────┐
+                       │ Chronological Backtesting & Robustness       │
+                       │ • Out-of-time 75%/25% split (no leakage)     │
+                       │ • Bootstrap CIs, Confounding & Shift Tests   │
+                       └──────────────────────────────────────────────┘
 ```
 
 ---
 
-# System Architecture
+## Repository Structure
 
 ```text
-                         Transaction Data
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Data Cleaning & EDA │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Feature Engineering │
-                    │                     │
-                    │ • Price             │
-                    │ • Discount          │
-                    │ • Region            │
-                    │ • Time              │
-                    │ • Customer Cohort   │
-                    │ • Product           │
-                    └──────────┬──────────┘
-                               │
-                 ┌─────────────┴─────────────┐
-                 │                           │
-                 ▼                           ▼
-        ┌─────────────────┐         ┌──────────────────┐
-        │ Naive Elasticity│         │ Causal Analysis  │
-        │ Regression      │         │                  │
-        └────────┬────────┘         │ IV / DiD         │
-                 │                  └────────┬─────────┘
-                 │                           │
-                 └─────────────┬─────────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │ Heterogeneous      │
-                    │ Treatment Effects   │
-                    │                     │
-                    │ T-Learner /         │
-                    │ X-Learner           │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Segment-Level       │
-                    │ Uplift Estimation   │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Pricing Optimization│
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Backtesting &       │
-                    │ Revenue Simulation  │
-                    └─────────────────────┘
-```
-
----
-
-# Methodology
-
-## 1. Baseline: Naive Price Elasticity
-
-The first model estimates demand elasticity using regression.
-
-A simple log-log specification is:
-
-```text
-log(Q) = β₀ + β₁ log(P) + γX + ε
-```
-
-where:
-
-* `Q` = quantity/orders
-* `P` = price
-* `β₁` = estimated price elasticity
-* `X` = control variables
-* `ε` = error term
-
-Interpretation:
-
-```text
-β₁ < 0  → demand decreases as price increases
-β₁ ≈ -1 → unit elastic demand
-|β₁| > 1 → elastic demand
-|β₁| < 1 → inelastic demand
-```
-
-This provides a useful baseline but does not necessarily identify the causal effect of price.
-
----
-
-# 2. Confounding Analysis
-
-The system explicitly models potential confounders such as:
-
-* Region
-* Product category
-* Customer cohort
-* Time of day
-* Day of week
-* Month
-* Promotional periods
-* Historical demand
-* Seller availability
-* Order frequency
-
-Example:
-
-```text
-High demand
-     │
-     ├──────────────► Higher prices
-     │
-     └──────────────► More orders
-```
-
-If demand itself influences price, ordinary regression can produce biased elasticity estimates.
-
----
-
-# 3. Causal Inference
-
-The next stage estimates the causal effect of pricing interventions.
-
-Depending on the dataset, the project supports approaches such as:
-
-### Instrumental Variables
-
-An instrument `Z` is used when price is endogenous.
-
-```text
-Instrument Z
-     │
-     ▼
-   Price
-     │
-     ▼
-   Demand
-```
-
-A valid instrument should:
-
-1. Be correlated with treatment/price
-2. Affect the outcome primarily through treatment
-3. Not be directly related to unobserved outcome determinants
-
-The project evaluates these assumptions rather than treating IV as a black-box estimator.
-
----
-
-## Difference-in-Differences
-
-When a pricing or promotional intervention affects one group but not another:
-
-```text
-             Before        After
-
-Treatment      Y₁            Y₂
-Control        Y₃            Y₄
-```
-
-The estimated treatment effect is:
-
-```text
-(Y₂ - Y₁) - (Y₄ - Y₃)
-```
-
-This helps remove common time trends affecting both groups.
-
----
-
-# 4. Heterogeneous Treatment Effects
-
-A single average treatment effect is often insufficient for marketplace pricing.
-
-For example:
-
-```text
-Segment A → Highly price sensitive
-Segment B → Moderately price sensitive
-Segment C → Almost price insensitive
-```
-
-Applying the same discount to all customers can therefore destroy margin unnecessarily.
-
-The project estimates:
-
-```text
-τ(x) = E[Y(1) - Y(0) | X = x]
-```
-
-where `τ(x)` represents the treatment effect for a specific customer/segment profile.
-
----
-
-# 5. Uplift Modeling
-
-The project evaluates heterogeneous treatment-effect models such as:
-
-* T-Learner
-* X-Learner
-
-The goal is to estimate the incremental effect of a pricing intervention for each segment.
-
-Example:
-
-| Segment                | Expected Demand Lift | Expected Margin Impact |
-| ---------------------- | -------------------: | ---------------------: |
-| New customers          |                 High |                   High |
-| Frequent customers     |               Medium |                 Medium |
-| Highly loyal customers |                  Low |               Negative |
-| Price-sensitive region |                 High |                   High |
-
-This allows the pricing engine to prioritize interventions where they are most valuable.
-
----
-
-# 6. Pricing Optimization
-
-Once treatment effects are estimated, the system simulates alternative pricing policies.
-
-For each segment:
-
-```text
-Current Price
-      │
-      ├── Price - 10%
-      ├── Price - 5%
-      ├── Current Price
-      ├── Price + 5%
-      └── Price + 10%
-```
-
-For each scenario, estimate:
-
-```text
-Expected Orders
-Expected Revenue
-Expected Cost
-Expected Margin
-Incremental Revenue
-Incremental Margin
-```
-
-The pricing policy can then be selected based on an objective such as:
-
-```text
-Maximize Expected Incremental Margin
-```
-
-subject to business constraints.
-
----
-
-# Evaluation
-
-## Primary Metrics
-
-### Price Elasticity
-
-Measure:
-
-```text
-Elasticity = %ΔDemand / %ΔPrice
-```
-
-Estimate elasticity overall and by segment.
-
----
-
-### Incremental Revenue
-
-Compare:
-
-```text
-Optimized Pricing
-       vs.
-Flat Pricing
-```
-
-Calculate:
-
-```text
-Incremental Revenue
-=
-Revenue(Optimized)
--
-Revenue(Baseline)
-```
-
----
-
-### Incremental Margin
-
-Revenue alone is insufficient when discounts are involved.
-
-Therefore:
-
-```text
-Incremental Margin
-=
-Margin(Optimized)
--
-Margin(Baseline)
-```
-
-is also evaluated.
-
----
-
-### AUUC
-
-The **Area Under the Uplift Curve (AUUC)** measures how effectively the uplift model ranks customers/segments according to their incremental treatment effect.
-
-Higher AUUC indicates better targeting of pricing interventions.
-
----
-
-# Backtesting
-
-To avoid evaluating the model on the same period used for training:
-
-```text
-Historical Data
-      │
-      ├───────────────┐
-      │               │
-      ▼               ▼
- Training Period   Test Period
-      │               │
-      ▼               │
- Causal/Uplift       │
- Model               │
-      │               │
-      └───────┬───────┘
-              ▼
-        Backtest Policy
-```
-
-The final pricing policy is evaluated on a held-out time period.
-
----
-
-# Pricing Strategy Comparison
-
-The system compares multiple policies:
-
-### Random Policy
-
-Randomly assigns pricing interventions.
-
-### Flat Policy
-
-Applies the same pricing strategy across all customers.
-
-### Segment-Based Policy
-
-Uses estimated elasticity by segment.
-
-### Uplift-Based Policy
-
-Targets segments based on estimated heterogeneous treatment effects.
-
-The primary objective is to determine whether causal targeting produces higher incremental revenue or margin than simpler pricing strategies.
-
----
-
-# Experimental Design
-
-## Experiment 1 — Naive vs Causal Elasticity
-
-Compare:
-
-```text
-Naive Regression
-        vs.
-IV / DiD
-```
-
-Measure the difference in estimated elasticity.
-
----
-
-## Experiment 2 — Segment Heterogeneity
-
-Compare:
-
-```text
-Average Treatment Effect
-        vs.
-Conditional Treatment Effects
-```
-
-Determine whether pricing sensitivity varies significantly across:
-
-* Regions
-* Customer cohorts
-* Product categories
-* Order frequency groups
-
----
-
-## Experiment 3 — Uplift Models
-
-Compare:
-
-```text
-T-Learner
-X-Learner
-Baseline
-```
-
-using uplift metrics such as AUUC.
-
----
-
-## Experiment 4 — Pricing Policies
-
-Compare:
-
-```text
-Flat Pricing
-Random Targeting
-Elasticity-Based Pricing
-Uplift-Based Pricing
-```
-
-using:
-
-* Revenue
-* Margin
-* Incremental orders
-* Treatment cost
-* Customer coverage
-
----
-
-# Dataset
-
-The project can be evaluated using publicly available marketplace datasets such as:
-
-* **Olist Brazilian E-Commerce Dataset**
-* **Instacart Market Basket Analysis Dataset**
-* Other public transaction-level datasets
-
-Where real treatment variation is insufficient, a **synthetic marketplace environment** can be generated with controlled:
-
-* Price elasticity
-* Seasonality
-* Regional effects
-* Customer heterogeneity
-* Promotional effects
-* Demand shocks
-* Confounding relationships
-
-Synthetic simulation makes it possible to evaluate causal estimators against known ground-truth treatment effects.
-
----
-
-# Example Dataset Schema
-
-```text
-order_id
-customer_id
-product_id
-region
-timestamp
-price
-discount
-quantity
-category
-promotion_flag
-customer_cohort
-historical_orders
-competitor_price
-revenue
-cost
-margin
-```
-
----
-
-# Example Analysis
-
-A hypothetical result might look like:
-
-```text
-Naive Elasticity:       -0.42
-Causal Elasticity:      -0.71
-
-Estimated bias:
-Naive estimate understates price sensitivity
-```
-
-Segment-level analysis:
-
-```text
-Region A: -0.92
-Region B: -0.63
-Region C: -0.31
-```
-
-This suggests that applying the same pricing strategy across all regions may be suboptimal.
-
----
-
-# Error & Validity Analysis
-
-Causal inference requires more than simply fitting a model.
-
-The project investigates:
-
-### Confounding
-
-Are important variables omitted from the model?
-
-### Positivity
-
-Does every relevant segment have sufficient treatment variation?
-
-### SUTVA
-
-Can one customer's treatment affect another customer's outcome?
-
-### Instrument Validity
-
-For IV estimation:
-
-```text
-Relevance
-Exclusion Restriction
-Independence
-```
-
-must be considered.
-
-### Parallel Trends
-
-For DiD:
-
-```text
-Treatment
-Control
-```
-
-groups should exhibit sufficiently similar pre-treatment trends.
-
----
-
-# Simpson's Paradox
-
-The project also demonstrates how aggregated elasticity can differ substantially from segment-level elasticity.
-
-Example:
-
-```text
-Overall:
-Price ↑ → Demand appears stable
-
-Within Region A:
-Price ↑ → Demand ↓
-
-Within Region B:
-Price ↑ → Demand ↓
-```
-
-This highlights why marketplace pricing models should explicitly account for segmentation and confounding.
-
----
-
-# Technology Stack
-
-### Programming
-
-* Python
-* Pandas
-* NumPy
-
-### Machine Learning
-
-* Scikit-learn
-* XGBoost
-* Gradient Boosting
-
-### Causal Inference
-
-* EconML
-* DoWhy
-* Statsmodels
-
-### Visualization
-
-* Matplotlib
-* Plotly
-
-### Experimentation
-
-* Jupyter
-* Custom backtesting framework
-
----
-
-# Project Structure
-
-```text
-Causal-Pricing-Intelligence/
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── synthetic/
-│
+Causal-Inference-Based-Pricing-Revenue-Optimization-Engine/
+├── config/
+│   ├── settings.yaml              # Central hyperparameters, DGP config, constraints
+│   └── loader.py                  # Config & logging utilities
+├── simulation/
+│   ├── ground_truth.py            # True structural elasticities & potential outcomes
+│   ├── data_generator.py          # Configurable synthetic marketplace (10k–500k rows)
+│   └── marketplace.py             # Oracle counterfactual evaluator & Olist adapter
 ├── preprocessing/
-│   ├── cleaning.py
-│   └── feature_engineering.py
-│
+│   ├── validation.py              # Schema, domain, target & temporal leakage checks
+│   ├── cleaning.py                # Missing values, duplicates, outlier winsorization
+│   └── feature_engineering.py     # Calendar, competitor gaps, strict prior aggregates
 ├── analysis/
-│   ├── eda.py
-│   ├── elasticity.py
-│   └── segmentation.py
-│
+│   ├── eda.py                     # Exploratory summaries across regions/cohorts/categories
+│   ├── elasticity.py              # Linear, naive log-log, controlled log-log, VIF/BP/JB
+│   ├── segmentation.py            # Segment unit-economics profiling
+│   └── confounding.py             # Confounder screen, Simpson's Paradox, NetworkX DAG
 ├── causal/
-│   ├── iv.py
-│   ├── did.py
-│   └── diagnostics.py
-│
+│   ├── identification.py          # CausalAssumptionError & testable/untestable registry
+│   ├── iv.py                      # Two-Stage Least Squares (2SLS), F-stat, Wu-Hausman
+│   ├── did.py                     # DiD interaction OLS, pre-trend test, event study
+│   └── diagnostics.py             # Propensity overlap, IPW SMD balance, Cinelli-Hazlett RV
 ├── uplift/
-│   ├── t_learner.py
-│   ├── x_learner.py
-│   └── evaluation.py
-│
+│   ├── base.py                    # BaseUpliftEstimator, SLearner baseline, regressor factory
+│   ├── t_learner.py               # T-Learner implementation
+│   ├── x_learner.py               # X-Learner with imputed effects & propensity blending
+│   ├── evaluation.py              # IPW-adjusted AUUC, Qini, decile uplift, PEHE
+│   └── segmentation.py            # Segment-level CATE aggregation
 ├── optimization/
-│   ├── pricing_policy.py
-│   ├── revenue.py
-│   └── simulation.py
-│
+│   ├── revenue.py                 # Unit economics & policy financial aggregations
+│   ├── constraints.py             # Margin, discount, price, availability & coverage caps
+│   ├── pricing_policy.py          # CounterfactualOutcomeModel & 4 pricing policies
+│   └── simulation.py              # Unified policy evaluation & oracle benchmarking
 ├── evaluation/
-│   ├── metrics.py
-│   ├── backtest.py
-│   └── experiments.py
-│
+│   ├── metrics.py                 # RMSE, MAE, relative bias
+│   ├── backtest.py                # Strict chronological out-of-time backtesting
+│   ├── experiments.py             # Automated runner for Experiments 1–4 (CSV/JSON)
+│   └── robustness.py              # Bootstrap CIs, confounding & shift stress tests
+├── visualization/
+│   ├── elasticity_plots.py        # Plots 1–4
+│   ├── causal_plots.py            # Plots 5–6 & DiD event study
+│   ├── uplift_plots.py            # Plots 7–9
+│   └── pricing_plots.py           # Plots 10–14 & interactive Plotly HTML exports
 ├── notebooks/
 │   ├── 01_eda.ipynb
 │   ├── 02_elasticity.ipynb
 │   ├── 03_causal_inference.ipynb
-│   └── 04_uplift_modeling.ipynb
-│
-├── tests/
-│
-├── requirements.txt
-└── README.md
+│   ├── 04_uplift_modeling.ipynb
+│   └── 05_pricing_optimization.ipynb
+├── tests/                         # Automated pytest suite (13 test suites incl. edge cases)
+├── docs/
+│   └── TECHNICAL_METHODOLOGY.md   # Mathematical & identification documentation
+├── reports/
+│   ├── experiment_report.md       # Auto-generated experiment report
+│   ├── experiments/               # Machine-readable CSV & JSON experiment outputs
+│   └── figures/                   # Publication-quality PNGs & Plotly HTMLs
+├── app.py                         # Interactive Streamlit dashboard (live pipeline)
+├── main.py                        # Unified CLI entry point
+├── pyproject.toml
+└── requirements.txt
 ```
 
 ---
 
-# Installation
+## Methodology & Algorithms
 
-Clone the repository:
+For complete mathematical derivations and identification proofs, see [TECHNICAL_METHODOLOGY.md](docs/TECHNICAL_METHODOLOGY.md).
 
-```bash
-git clone https://github.com/<your-username>/<repository-name>.git
+1. **Synthetic Marketplace (`simulation/`)**: Models heterogeneous elasticities across regions (`North`, `East`, `South`, `West`), cohorts (`New`, `Returning`, `Loyal`, `VIP`), categories, and order frequencies; seasonality, weekend/festival spikes, competitor pricing, seller availability, unobserved surge-pricing confounding (`u_demand`), a valid excluded cost instrument (`supplier_cost_shock`), a sharp Difference-in-Differences regional price rollout at day 180, and exact potential outcomes (`true_q0`, `true_q1`, `true_cate_qty`, `true_cate_margin`).
+2. **Baseline Elasticity (`analysis/elasticity.py`)**: Estimates Linear OLS, Naive Log-Log OLS, Controlled Log-Log OLS, and within-segment elasticities with HC3 robust standard errors, VIF multicollinearity, Breusch-Pagan heteroskedasticity, and Jarque-Bera residual diagnostics.
+3. **Causal Inference (`causal/`)**:
+   - **2SLS IV (`causal/iv.py`)**: Implemented from first principles with Stage-1 partial $F$-statistic, weak-instrument detection ($F < 10$), Stage-2 asymptotic HC1 sandwich standard errors using structural residuals, Wu-Hausman endogeneity test, and covariate balance checks across instrument quantiles.
+   - **DiD (`causal/did.py`)**: 2x2 interaction regression with HC3 SEs, implied Wald/DiD price elasticity, pre-treatment linear trend test, and dynamic event-study leads/lags.
+   - **Causal Diagnostics (`causal/diagnostics.py`)**: Propensity common-support overlap, raw vs. IPW Standardized Mean Differences, SUTVA contention checks, and Cinelli-Hazlett omitted-variable Robustness Values.
+4. **Uplift Modeling (`uplift/`)**: Implements `SLearner`, `TLearner`, and `XLearner` under a unified interface using `HistGradientBoostingRegressor` (plus `RandomForest`, `XGBoost`, and `Ridge` support), evaluated with IPW-adjusted AUUC, Qini coefficient, decile uplift, PEHE, and Spearman rank correlation.
+5. **Pricing Optimization & Backtesting (`optimization/`, `evaluation/backtest.py`)**: Evaluates candidate actions `[-10%, -5%, 0%, +5%, +10%]` under `PricingConstraints` (`min_margin_pct >= 8%`, `max_discount <= 35%`, price bounds, seller availability, coverage limits) to maximize **Expected Incremental Margin**, comparing `Flat Policy`, `Random Policy`, `Segment-Based Policy`, and `Uplift-Based Policy` strictly out-of-time on the final 25% chronological test window.
 
-cd <repository-name>
-```
+---
 
-Create a virtual environment:
+## Installation & Execution
+
+Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
-```
-
-Activate on Windows:
-
-```bash
+# Windows:
 .venv\Scripts\activate
-```
-
-Activate on Linux/macOS:
-
-```bash
+# Linux/macOS:
 source .venv/bin/activate
-```
 
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
 ```
 
----
+### Main Pipeline CLI
 
-# Running the Analysis
+```bash
+# Run complete end-to-end pipeline (50,000 synthetic rows, Experiments 1-4, robustness, figures, report)
+python main.py --experiment all
 
-Run the exploratory analysis:
+# Run individual stages
+python main.py --experiment data --n-rows 50000
+python main.py --experiment elasticity
+python main.py --experiment causal
+python main.py --experiment uplift
+python main.py --experiment optimization
+python main.py --experiment backtest
+python main.py --experiment robustness
+```
+
+### Standalone Module Commands
 
 ```bash
 python analysis/eda.py
-```
-
-Estimate baseline elasticity:
-
-```bash
 python analysis/elasticity.py
-```
-
-Run causal estimation:
-
-```bash
 python causal/iv.py
-```
-
-or:
-
-```bash
 python causal/did.py
-```
-
-Train uplift models:
-
-```bash
 python uplift/t_learner.py
-```
-
-Run pricing backtests:
-
-```bash
 python optimization/simulation.py
 ```
 
----
+### Tests & Interactive Dashboard
 
-# Key Research Questions
+```bash
+pytest
+streamlit run app.py
+```
 
-The project investigates:
+### Public Dataset Support (Olist)
 
-1. How different is causal price elasticity from naive regression elasticity?
-2. How much does confounding bias pricing decisions?
-3. Does price sensitivity vary significantly across customer segments?
-4. Which causal estimator performs best under different data-generating conditions?
-5. Can uplift models identify customers who benefit most from discounts?
-6. Does targeted pricing outperform flat pricing?
-7. What is the trade-off between incremental revenue and margin?
-8. How robust are pricing recommendations under distribution shifts?
-9. How can pricing experiments be deployed safely in a real marketplace?
+To run exploratory, correlational elasticity, confounding, and predictive backtesting on the **Olist Brazilian E-Commerce Dataset**, place the Kaggle CSV files (`olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `olist_customers_dataset.csv`, `olist_products_dataset.csv`) under `data/raw/olist/` and run:
 
----
+```bash
+python main.py --experiment elasticity --dataset olist
+```
 
-# Limitations
-
-Real-world pricing systems have additional challenges that may not be completely captured by public datasets:
-
-* Competitive pricing
-* Supply constraints
-* Strategic customer behavior
-* Cannibalization
-* Long-term customer retention
-* Interference between customers
-* Inventory effects
-* Dynamic marketplace equilibrium
-
-Therefore, results should be interpreted as **decision-support estimates**, not guaranteed outcomes.
-
-A production deployment would require controlled experimentation and appropriate business guardrails.
+> **Causal Scope Note:** Because Olist is purely observational without a documented exogenous pricing instrument, sharp policy rollout date, or randomized discount assignment, causal IV, DiD, and randomized uplift claims are not supported on raw Olist data alone.
 
 ---
 
-# Future Work
+## Actual Measured Experimental Results (50,000 Synthetic Transactions, Seed=42)
 
-Potential extensions include:
+> **Disclaimer:** All metrics below were measured directly by executing `python main.py --experiment all --n-rows 50000 --seed 42` on the synthetic marketplace environment (`reports/experiments/`). They validate estimator and policy behavior against known synthetic counterfactuals and must not be interpreted as real-world business impact.
 
-* Doubly robust treatment-effect estimation
-* Causal forests
-* Double/debiased machine learning
-* Bayesian hierarchical elasticity models
-* Dynamic pricing under inventory constraints
-* Reinforcement learning for pricing
-* Multi-treatment uplift modeling
-* Customer lifetime-value-aware pricing
-* Competitive pricing features
-* Online experimentation with safety guardrails
-* Real-time pricing APIs
-* Monitoring for treatment-effect drift
+### Dataset Summary
+* **Transactions:** 50,000 (`2024-01-01` to `2024-12-30`) | **Customers:** 4,000 | **Products:** 120
+* **Observed Revenue:** \$17,386,171.04 | **Observed Margin:** \$6,793,384.25 (39.1%)
+
+### Experiment 1 — Naive vs. Causal Elasticity
+
+| Method | Estimated Elasticity | Std. Error | 95% CI | True Mean Reference | Bias |
+| --- | ---: | ---: | --- | ---: | ---: |
+| Linear OLS (Mean Elasticity) | +0.1717 | 0.0052 | [0.1615, 0.1820] | -0.9940 | +1.1657 |
+| Naive Log-Log OLS | +0.1127 | 0.0042 | [0.1044, 0.1210] | -0.9940 | +1.1067 |
+| Controlled Log-Log OLS | -0.5617 | 0.0061 | [-0.5736, -0.5498] | -0.9940 | +0.4323 |
+| **Causal 2SLS IV** | **-0.9773** | **0.0072** | **[-0.9915, -0.9632]** | **-0.9940** | **+0.0166** |
+| **Causal DiD (Treated Implied)** | **-1.3511** | — | — | **-1.3056** | **-0.0455** |
+
+* **IV First-Stage $F$-statistic:** `152,064.66` (`weak_instrument = False`)
+* **DiD Pre-Trend Differential Slope $p$-value:** `0.4315` (no statistically significant pre-treatment divergence)
+* **Simpson's Paradox:** Pooled naive slope is **+0.1127**, whereas within-region controlled elasticities are strictly negative across every region: `North` (`-0.9319`), `East` (`-0.7500`), `South` (`-0.3853`), `West` (`-0.0766`).
+
+### Experiment 2 — Segment Heterogeneity (ATE vs. CATE)
+
+* **Overall Quantity ATE (15% promo intervention):** `+1.1257` units | **Overall Margin ATE:** `-$40.41` (SD `80.16`), showing that uniform promotional discounting destroys margin on average.
+* Across cohorts, predicted quantity lift is higher for `New` (`+1.1931`) and `Returning` (`+1.2027`) customers than `VIP` (`+0.9212`), while `Electronics` suffers the largest margin erosion (`-$102.61`) under blanket discounting compared to `Beauty` (`-$19.25`) and `Grocery` (`-$19.93`).
+
+### Experiment 3 — Uplift Model Benchmark (Held-Out Margin CATE)
+
+| Model | Normalized Excess AUUC | Qini Coefficient | Top Decile Uplift | Bottom Decile Uplift | PEHE (RMSE vs. True CATE) | Spearman Rank Corr |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| S-Learner (Baseline) | 0.2145 | 0.2467 | -$10.33 | -$95.60 | 37.77 | 0.7022 |
+| T-Learner | 0.2426 | 0.2262 | -$5.98 | -$84.91 | 86.30 | 0.6492 |
+| X-Learner | 0.1902 | 0.1784 | -$16.39 | -$56.43 | 52.96 | **0.7029** |
+
+### Experiment 4 — Chronological Backtest & Pricing Policy Comparison (12,500 Held-Out Test Rows)
+
+* **Observed Historical Test Period:** Revenue `\$3,768,079.40` | Margin `\$1,390,601.84`
+
+| Policy | Total Revenue | Total Margin | Incremental Revenue | Incremental Margin | Incremental Orders | Discount Expenditure | Treatment Coverage |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Flat Policy (-5%) | \$3,933,313.49 | \$1,394,495.42 | +\$325,579.72 | +\$47,993.34 | +6,084.86 | \$172,549.84 | 68.91% |
+| Random Policy | \$3,767,556.19 | \$1,423,924.81 | +\$159,822.42 | +\$77,422.72 | +1,590.46 | \$102,344.54 | 67.34% |
+| Segment-Based Policy | \$3,754,464.05 | \$1,601,069.97 | +\$146,730.27 | +\$254,567.88 | -2,999.96 | \$0.00 | 89.16% |
+| **Uplift-Based Policy** | **\$3,786,279.10** | **\$1,605,611.07** | **+\$178,545.33** | **+\$259,108.98** | **-1,948.57** | **\$13,435.85** | **89.16%** |
+
+Key takeaway: **Flat -5% discounting** drives the highest unit volume (`+6,085` orders) and top-line revenue (`\$3.93M`), yet burns `\$172.5k` in discount expenditure and yields only `+$48.0k` incremental margin. **Uplift-Based Policy** targets discounts selectively (`\$13.4k` discount expenditure) while raising prices within guardrails on inelastic segments, achieving **`+$259.1k` incremental margin** (**5.4x** the incremental margin of Flat Policy, and outperforming Segment-Based Policy on both revenue and margin).
+
+### Robustness Stress Test — Confounding Sensitivity (12,000 Rows per Level)
+
+| Confounding Strength | True Elasticity | Naive OLS | Controlled OLS | 2SLS IV | Controlled OLS Abs Error | 2SLS IV Abs Error |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.0 | -1.0293 | +0.0655 | -1.0032 | -1.0227 | 0.0261 | 0.0066 |
+| 0.5 | -1.0293 | +0.0735 | -0.8876 | -1.0202 | 0.1417 | 0.0091 |
+| 1.0 | -1.0293 | +0.1024 | -0.6023 | -1.0183 | 0.4270 | 0.0110 |
+| 1.8 | -1.0293 | +0.1792 | -0.0826 | -1.0125 | 0.9467 | 0.0168 |
 
 ---
 
-# Project Goal
+## Generated Visualizations & Reports
 
-Most pricing analytics systems answer:
+All plots are saved under `reports/figures/` (plus interactive Plotly HTML files in `reports/figures/interactive/`):
+1. `01_price_vs_demand.png` — Transaction price vs. demand & binned log-log curve
+2. `02_naive_vs_causal_elasticity.png` — OLS vs. 2SLS IV vs. DiD comparison against truth
+3. `03_elasticity_by_region.png` — Regional elasticity breakdown
+4. `04_elasticity_by_cohort.png` — Customer cohort elasticity breakdown
+5. `05_confounding_analysis.png` — Confounder correlations & Marketplace Causal DAG
+6. `06_simpsons_paradox.png` — Pooled vs. within-region demand slopes
+7. `07_treatment_effect_distribution.png` — Predicted quantity & margin CATE distributions
+8. `08_uplift_curve.png` — Cumulative IPW-adjusted uplift curves
+9. `09_auuc_comparison.png` — Normalized AUUC & PEHE comparison
+10. `10_policy_revenue_comparison.png` — Total revenue by pricing policy
+11. `11_policy_margin_comparison.png` — Total margin by pricing policy
+12. `12_incremental_revenue_margin.png` — Incremental revenue vs. incremental margin lift
+13. `13_backtesting_results.png` — Held-out weekly cumulative margin trajectories
+14. `14_robustness_analysis.png` — Confounding sensitivity & sample-size convergence
+15. `15_did_event_study.png` — Difference-in-Differences pre-trend & post-policy event study
 
-> **"What happened when prices changed?"**
+---
 
-This project aims to answer a more useful question:
+## Causal Assumptions & Limitations
 
-> **"What would happen if we changed the price, and for whom should we make that change?"**
+* **Unverified Observational Assumptions:** While IV relevance ($F$-stat) and DiD pre-treatment trend slopes can be tested, the **IV exclusion restriction**, **IV independence from unobserved confounders**, **post-treatment parallel trends**, and **conditional unconfoundedness** for uplift models cannot be proven from observational data alone.
+* **Marketplace Equilibrium & SUTVA:** Real two-sided marketplaces exhibit cross-product cannibalization, seller inventory depletion, strategic customer waiting, and competitor price retaliation, which unit-level static counterfactuals do not capture.
+* **Decision-Support Role:** Production rollout requires randomized online A/B pricing experiments with safety guardrails and post-deployment drift monitoring.
 
-The combination of **causal inference, elasticity modeling, heterogeneous treatment effects, and pricing optimization** transforms the project from a conventional analytics dashboard into a decision-support framework for marketplace pricing.
+---
+
+## Future Work
+
+* Doubly robust (AIPW) & Causal Forest estimators for continuous multi-dose pricing treatments
+* Dynamic inventory-constrained contextual bandits / reinforcement learning
+* Cross-price cannibalization matrices across substitute SKUs
+* Customer lifetime value (LTV)-aware multi-period pricing optimization
 
 ---
 
 ## Author
 
-**Ashish Rawal**
-
-Project exploring **causal inference, machine learning, pricing analytics, experimentation, and marketplace optimization**.
+**Ashish Rawal** — Exploring **causal inference, heterogeneous uplift modeling, experimentation, and marketplace pricing optimization**.
