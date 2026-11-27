@@ -1,1 +1,249 @@
-{}
+{
+  "exp1_elasticity": [
+    {
+      "method": "Linear OLS (Mean Elasticity)",
+      "elasticity": 0.17171105494449285,
+      "std_error": 0.005229514282027628,
+      "ci_low": 0.16146139529508088,
+      "ci_high": 0.18196071459390484,
+      "true_reference": -0.9939673657999998,
+      "bias": 1.1656784207444926
+    },
+    {
+      "method": "Naive Log-Log OLS",
+      "elasticity": 0.1127044473066682,
+      "std_error": 0.0042393826410630575,
+      "ci_low": 0.10439541001350032,
+      "ci_high": 0.12101348459983609,
+      "true_reference": -0.9939673657999998,
+      "bias": 1.106671813106668
+    },
+    {
+      "method": "Controlled Log-Log OLS",
+      "elasticity": -0.5616744048029187,
+      "std_error": 0.006079845780332699,
+      "ci_low": -0.5735906835639286,
+      "ci_high": -0.5497581260419089,
+      "true_reference": -0.9939673657999998,
+      "bias": 0.43229296099708103
+    },
+    {
+      "method": "Causal 2SLS IV",
+      "elasticity": -0.9773234352128028,
+      "std_error": 0.00722489819956019,
+      "ci_low": -0.9914843184096057,
+      "ci_high": -0.963162552016,
+      "true_reference": -0.9939673657999998,
+      "bias": 0.01664393058719693
+    },
+    {
+      "method": "Causal DiD (Implied Treated Elasticity)",
+      "elasticity": -1.351124463119581,
+      "std_error": NaN,
+      "ci_low": NaN,
+      "ci_high": NaN,
+      "true_reference": -1.3055888057742782,
+      "bias": -0.04553565734530274
+    }
+  ],
+  "exp1_iv_first_stage_f": 152064.65860732153,
+  "exp1_did_pretrend_p": 0.4314977865628097,
+  "exp1_simpsons_paradox": {
+    "pooled": 0.1127044473066682,
+    "paradox_detected": true
+  },
+  "exp2_ate": {
+    "ate_quantity": 1.1257113175336275,
+    "ate_margin": -40.412401519847776,
+    "cate_margin_std": 80.15825939891488
+  },
+  "exp3_uplift": [
+    {
+      "model": "S-Learner",
+      "auuc": -83636.64673168061,
+      "auuc_normalized": 0.21454902716244315,
+      "qini_coefficient": 0.24671266701295708,
+      "top_decile_uplift": -10.331958037506633,
+      "bottom_decile_uplift": -95.59960943559308,
+      "estimated_ate": -27.846609134822465,
+      "pehe": 37.766234835295855,
+      "ate_abs_error": 1.059904558822467,
+      "cate_rank_corr": 0.7021829264393505
+    },
+    {
+      "model": "T-Learner",
+      "auuc": -75429.1334354049,
+      "auuc_normalized": 0.24256118148177222,
+      "qini_coefficient": 0.22623456342712667,
+      "top_decile_uplift": -5.97939688054944,
+      "bottom_decile_uplift": -84.907464196227,
+      "estimated_ate": -44.74556557509948,
+      "pehe": 86.29847639346612,
+      "ate_abs_error": 17.95886099909948,
+      "cate_rank_corr": 0.6491751208180037
+    },
+    {
+      "model": "X-Learner",
+      "auuc": -90763.78673997035,
+      "auuc_normalized": 0.19022417521754664,
+      "qini_coefficient": 0.1784498563203781,
+      "top_decile_uplift": -16.386187976948438,
+      "bottom_decile_uplift": -56.434866229571774,
+      "estimated_ate": -35.22693679416494,
+      "pehe": 52.95721094084625,
+      "ate_abs_error": 8.440232218164944,
+      "cate_rank_corr": 0.702871049214633
+    }
+  ],
+  "exp4_observed_test": {
+    "train_rows": 37500,
+    "test_rows": 12500,
+    "train_start": "2024-01-01 00:01:00",
+    "train_end": "2024-10-01 06:59:00",
+    "test_start": "2024-10-01 07:07:00",
+    "test_end": "2024-12-30 23:51:00",
+    "observed_test_revenue": 3768079.4000000004,
+    "observed_test_margin": 1390601.8399999999,
+    "observed_test_orders": 53020.2001
+  },
+  "exp4_oracle_policies": [
+    {
+      "total_revenue": 3933313.491097862,
+      "total_cost": 2538818.066647038,
+      "total_margin": 1394495.4244508243,
+      "total_orders": 56182.43482902166,
+      "baseline_revenue": 3607733.7737169233,
+      "baseline_margin": 1346502.0844320673,
+      "baseline_orders": 50097.5727383799,
+      "incremental_revenue": 325579.7173809386,
+      "incremental_margin": 47993.34001875692,
+      "incremental_orders": 6084.862090641756,
+      "discount_expenditure": 172549.84208239973,
+      "treatment_coverage": 0.68912,
+      "policy": "Flat Policy",
+      "evaluation_mode": "synthetic_ground_truth",
+      "avg_price_change_pct": -0.034455999999999994
+    },
+    {
+      "total_revenue": 3767556.1904288926,
+      "total_cost": 2343631.382038584,
+      "total_margin": 1423924.808390309,
+      "total_orders": 51688.03594463549,
+      "baseline_revenue": 3607733.7737169233,
+      "baseline_margin": 1346502.0844320673,
+      "baseline_orders": 50097.5727383799,
+      "incremental_revenue": 159822.4167119693,
+      "incremental_margin": 77422.72395824175,
+      "incremental_orders": 1590.4632062555902,
+      "discount_expenditure": 102344.53968927223,
+      "treatment_coverage": 0.67344,
+      "policy": "Random Policy",
+      "evaluation_mode": "synthetic_ground_truth",
+      "avg_price_change_pct": 0.0106
+    },
+    {
+      "total_revenue": 3754464.0459054825,
+      "total_cost": 2153394.0781941647,
+      "total_margin": 1601069.967711318,
+      "total_orders": 47097.61150237935,
+      "baseline_revenue": 3607733.7737169233,
+      "baseline_margin": 1346502.0844320673,
+      "baseline_orders": 50097.5727383799,
+      "incremental_revenue": 146730.27218855917,
+      "incremental_margin": 254567.8832792507,
+      "incremental_orders": -2999.9612360005485,
+      "discount_expenditure": 0.0,
+      "treatment_coverage": 0.8916,
+      "policy": "Segment-Based Policy",
+      "evaluation_mode": "synthetic_ground_truth",
+      "avg_price_change_pct": 0.08916
+    },
+    {
+      "total_revenue": 3786279.0987648796,
+      "total_cost": 2180668.0303035686,
+      "total_margin": 1605611.0684613106,
+      "total_orders": 48149.000742922144,
+      "baseline_revenue": 3607733.7737169233,
+      "baseline_margin": 1346502.0844320673,
+      "baseline_orders": 50097.5727383799,
+      "incremental_revenue": 178545.3250479563,
+      "incremental_margin": 259108.98402924323,
+      "incremental_orders": -1948.571995457758,
+      "discount_expenditure": 13435.850502581121,
+      "treatment_coverage": 0.8916,
+      "policy": "Uplift-Based Policy",
+      "evaluation_mode": "synthetic_ground_truth",
+      "avg_price_change_pct": 0.070308
+    }
+  ],
+  "exp4_model_policies": [
+    {
+      "total_revenue": 4356444.542280449,
+      "total_cost": 2800408.064627532,
+      "total_margin": 1556036.4776529167,
+      "total_orders": 59505.34898377633,
+      "baseline_revenue": 4087030.8562626103,
+      "baseline_margin": 1544255.9944245024,
+      "baseline_orders": 53783.94176808621,
+      "incremental_revenue": 269413.6860178383,
+      "incremental_margin": 11780.48322841432,
+      "incremental_orders": 5721.407215690124,
+      "discount_expenditure": 194102.53372100287,
+      "treatment_coverage": 0.68912,
+      "policy": "Flat Policy",
+      "evaluation_mode": "model_estimated",
+      "avg_price_change_pct": -0.034455999999999994
+    },
+    {
+      "total_revenue": 4231081.417722618,
+      "total_cost": 2617557.774304051,
+      "total_margin": 1613523.6434185677,
+      "total_orders": 55253.927353359446,
+      "baseline_revenue": 4087030.8562626103,
+      "baseline_margin": 1544255.9944245024,
+      "baseline_orders": 53783.94176808621,
+      "incremental_revenue": 144050.5614600079,
+      "incremental_margin": 69267.64899406536,
+      "incremental_orders": 1469.9855852732362,
+      "discount_expenditure": 116119.63334288994,
+      "treatment_coverage": 0.67344,
+      "policy": "Random Policy",
+      "evaluation_mode": "model_estimated",
+      "avg_price_change_pct": 0.0106
+    },
+    {
+      "total_revenue": 4268228.7560810605,
+      "total_cost": 2430231.4647382554,
+      "total_margin": 1837997.2913428047,
+      "total_orders": 50643.68365581654,
+      "baseline_revenue": 4087030.8562626103,
+      "baseline_margin": 1544255.9944245024,
+      "baseline_orders": 53783.94176808621,
+      "incremental_revenue": 181197.8998184502,
+      "incremental_margin": 293741.2969183023,
+      "incremental_orders": -3140.258112269672,
+      "discount_expenditure": 0.0,
+      "treatment_coverage": 0.8916,
+      "policy": "Segment-Based Policy",
+      "evaluation_mode": "model_estimated",
+      "avg_price_change_pct": 0.08916
+    },
+    {
+      "total_revenue": 4312512.837012843,
+      "total_cost": 2466380.863116554,
+      "total_margin": 1846131.9738962897,
+      "total_orders": 52005.60992063678,
+      "baseline_revenue": 4087030.8562626103,
+      "baseline_margin": 1544255.9944245024,
+      "baseline_orders": 53783.94176808621,
+      "incremental_revenue": 225481.98075023293,
+      "incremental_margin": 301875.97947178734,
+      "incremental_orders": -1778.33184744943,
+      "discount_expenditure": 17443.85523222791,
+      "treatment_coverage": 0.8916,
+      "policy": "Uplift-Based Policy",
+      "evaluation_mode": "model_estimated",
+      "avg_price_change_pct": 0.070308
+    }
+  ]
+}
