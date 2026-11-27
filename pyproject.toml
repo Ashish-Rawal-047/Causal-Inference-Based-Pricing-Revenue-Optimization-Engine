@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=57.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "causal-pricing-intelligence"
+version = "0.1.0"
+description = "Causal Inference-Based Pricing & Revenue Optimization Engine"
+readme = "Readme.md"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = [
+    "config*",
+    "simulation*",
+    "preprocessing*",
+    "analysis*",
+    "causal*",
+    "uplift*",
+    "optimization*",
+    "evaluation*",
+    "visualization*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
